@@ -266,24 +266,31 @@ def parse_args():
 async def main():
     args = parse_args()
 
-    api_id = os.getenv("API_ID")
-    api_hash = os.getenv("API_HASH")
-    session_name = os.getenv("SESSION_NAME", "session")
+    api_id = (os.getenv("API_ID") or "").strip()
+    api_hash = (os.getenv("API_HASH") or "").strip()
+    phone = (os.getenv("PHONE") or "").strip() or None
+    session_name = (os.getenv("SESSION_NAME") or "").strip() or "session"
     if not api_id or not api_hash:
         fail("API_ID / API_HASH missing. Copy .env.example to .env and fill it in.")
+    try:
+        api_id = int(api_id)
+    except ValueError:
+        fail(f"API_ID must be a number, got {api_id!r}. Check your .env.")
 
     channels = args.channels or [
-        c.strip() for c in os.getenv("CHANNELS", "").split(",") if c.strip()
+        c.strip() for c in (os.getenv("CHANNELS") or "").split(",") if c.strip()
     ]
     if not channels:
         fail("No channels given. Use --channel or set CHANNELS in .env.")
 
-    output_dir = Path(args.output_dir or os.getenv("OUTPUT_DIR", "output"))
+    output_dir = Path(args.output_dir or (os.getenv("OUTPUT_DIR") or "").strip() or "output")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    client = TelegramClient(session_name, int(api_id), api_hash)
+    client = TelegramClient(session_name, api_id, api_hash)
     client.flood_sleep_threshold = 60
-    await client.start()
+    # phone=None falls back to Telethon's interactive "Please enter your phone" prompt.
+    # If PHONE is set in .env, only the login code (sent via Telegram) is asked for.
+    await client.start(phone=phone)
     log("Client connected.")
 
     for raw_channel in channels:

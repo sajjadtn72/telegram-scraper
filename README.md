@@ -30,29 +30,49 @@ gauge its health (activity level, most active members, engagement trends).
 - **Flood-wait safe** — automatically sleeps and retries when Telegram
   rate-limits requests.
 
-## Install
+## Install & run (Windows / PowerShell)
 
-```bash
+Open PowerShell in the project folder and run:
+
+```powershell
+cd path\to\telegram-channel-scraper
 pip install -r requirements.txt
+copy .env.example .env
+notepad .env          # fill in your own values, see below — then save & close
+python scraper.py
 ```
 
-## Configure
+(On macOS/Linux, same idea: `cp .env.example .env`, edit it with any editor,
+then `python3 scraper.py`.)
 
-```bash
-cp .env.example .env
+## Configure `.env`
+
+Edit the values between the quotes — don't remove the quotes themselves:
+
+```env
+API_ID = ""
+API_HASH = ""
+PHONE = "+98"
+SESSION_NAME = "my_session"
+CHANNELS = ""
+OUTPUT_DIR = "output"
 ```
-
-Edit `.env`:
 
 | Key | Meaning |
 |---|---|
 | `API_ID`, `API_HASH` | From https://my.telegram.org → API development tools |
-| `SESSION_NAME` | Telethon session file name (created on first login if missing) |
+| `PHONE` | Your Telegram phone number with country code — required to log in |
+| `SESSION_NAME` | Any name you like for the session file (created on first login) |
 | `CHANNELS` | Comma-separated list of channels **or groups** (username, link, or numeric id) |
 | `OUTPUT_DIR` | Where JSON/CSV/media get written (default: `output/`) |
 
-First run will prompt for your phone number, the login code, and (if enabled)
-your 2FA password, then save a `.session` file so future runs don't ask again.
+**Logging in the first time:** the script needs your phone number, and
+Telegram will send a login code to your Telegram app (not SMS necessarily —
+check the app). When you run `python scraper.py` the first time, it will ask
+you to type that code in the terminal. If your account has two-factor
+authentication (2FA) enabled, it will also ask for your password. After this
+first successful login, a `.session` file is created and you won't be asked
+again on future runs.
 
 ## Usage
 
