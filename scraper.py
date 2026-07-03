@@ -7,7 +7,7 @@ multiple channels in a single invocation.
 
 Setup:
     pip install -r requirements.txt
-    copy .env.example .env      # then fill in API_ID / API_HASH / CHANNELS
+    create .env                 # fill in API_ID / API_HASH / CHANNELS
 
 Usage:
     python scraper.py
@@ -287,7 +287,7 @@ async def main():
     phone = (os.getenv("PHONE") or "").strip() or None
     session_name = (os.getenv("SESSION_NAME") or "").strip() or "session"
     if not api_id or not api_hash:
-        fail("API_ID / API_HASH missing. Copy .env.example to .env and fill it in.")
+        fail("API_ID / API_HASH missing. Create a .env file and fill them in.")
     try:
         api_id = int(api_id)
     except ValueError:

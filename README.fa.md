@@ -37,14 +37,12 @@
 
 ## نصب و اجرا (ویندوز / PowerShell)
 
-پاورشل رو توی پوشه‌ای باز کن که فایل‌های `scraper.py` و `.env.example` داخلش هستند، بعد این دستورات رو بزن:
+پاورشل رو توی پوشه‌ای باز کن که فایل `scraper.py` داخلش هست، بعد این دستورات رو بزن:
 
 ```powershell
 cd "path\to\telegram-channel-scraper"
-Get-ChildItem scraper.py, .env.example
+Get-ChildItem scraper.py
 pip install -r requirements.txt
-Copy-Item .env.example .env
-notepad .env          # یا با هر ادیتور دیگری .env رو باز کن، تغییر بده، Save کن و ببند
 python .\scraper.py
 ```
 
@@ -52,14 +50,14 @@ python .\scraper.py
 > توش clone/دانلود کردی جایگزین کن. مثلاً اگه پروژه توی
 > `F:\telegram-channel-scraper` هست، بنویس: `cd F:\telegram-channel-scraper`
 >
-> اگر `Get-ChildItem scraper.py, .env.example` خطا داد، یعنی داخل پوشه‌ی
-> اشتباه هستی. دستورهای `Copy-Item .env.example .env` و `python .\scraper.py`
-> باید دقیقاً داخل پوشه‌ی خود پروژه اجرا شوند، نه پوشه‌ی بالاتر مثل
-> `F:\Telegram app`.
+> اگر `Get-ChildItem scraper.py` خطا داد، یعنی داخل پوشه‌ی اشتباه هستی.
+> فایل `.env` و دستور `python .\scraper.py` باید دقیقاً داخل پوشه‌ی خود
+> پروژه باشند، نه پوشه‌ی بالاتر مثل `F:\Telegram app`.
 
 ## تنظیم فایل `.env`
 
-بعد از ساختن `.env`، این فایل رو با Notepad یا هر ادیتور دیگری باز کن:
+داخل همان پوشه‌ای که `scraper.py` هست، یک فایل به نام `.env` بساز و این
+محتوا را با مقادیر خودت داخلش بگذار:
 
 ```env
 API_ID = 123456

@@ -36,24 +36,22 @@ Open PowerShell in the folder that contains `scraper.py`, then run:
 
 ```powershell
 cd "path\to\telegram-channel-scraper"
-Get-ChildItem scraper.py, .env.example
+Get-ChildItem scraper.py
 pip install -r requirements.txt
-Copy-Item .env.example .env
-notepad .env          # or edit .env with any editor, then save and close
 python .\scraper.py
 ```
 
-If `Get-ChildItem scraper.py, .env.example` says a file does not exist, you
-are in the wrong folder. `Copy-Item .env.example .env` and `python .\scraper.py`
-must be run from the project folder, not from a parent folder such as
-`F:\Telegram app`.
+If `Get-ChildItem scraper.py` says the file does not exist, you are in the
+wrong folder. Create `.env` and run `python .\scraper.py` from the project
+folder, not from a parent folder such as `F:\Telegram app`.
 
-(On macOS/Linux, same idea: `cp .env.example .env`, edit it with any editor,
-then `python3 scraper.py`.)
+(On macOS/Linux, same idea: create `.env` with any editor, then
+`python3 scraper.py`.)
 
 ## Configure `.env`
 
-Edit `.env` with Notepad or any other editor:
+Create a `.env` file in the same folder as `scraper.py`, then put this inside
+it with your own values:
 
 ```env
 API_ID = 123456
