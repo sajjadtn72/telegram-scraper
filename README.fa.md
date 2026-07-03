@@ -42,7 +42,7 @@
 ```powershell
 cd "path\to\telegram-channel-scraper"
 Get-ChildItem scraper.py, .env
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 python .\scraper.py
 ```
 
@@ -53,6 +53,10 @@ python .\scraper.py
 > اگر `Get-ChildItem scraper.py, .env` خطا داد، یعنی داخل پوشه‌ی اشتباه
 > هستی. فایل `.env` و دستور `python .\scraper.py` باید دقیقاً داخل پوشه‌ی
 > خود پروژه باشند، نه پوشه‌ی بالاتر مثل `F:\Telegram app`.
+>
+> در ویندوز از `python -m pip ...` استفاده کن، نه `pip ...`. این کار
+> پکیج‌ها را با همان Python نصب می‌کند که `scraper.py` را اجرا می‌کند؛ حتی
+> اگر launcher جداگانه‌ی `pip` به یک Python قدیمی یا حذف‌شده وصل باشد.
 
 ## تنظیم فایل `.env`
 

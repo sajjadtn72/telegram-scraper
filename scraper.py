@@ -6,7 +6,7 @@ and/or CSV. Supports incremental (resume) runs, optional media download, and
 multiple channels in a single invocation.
 
 Setup:
-    pip install -r requirements.txt
+    python -m pip install -r requirements.txt
     edit .env                   # fill in API_ID / API_HASH / PHONE / CHANNELS
 
 Usage:

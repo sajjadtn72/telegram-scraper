@@ -37,13 +37,17 @@ Open PowerShell in the folder that contains `scraper.py`, then run:
 ```powershell
 cd "path\to\telegram-channel-scraper"
 Get-ChildItem scraper.py, .env
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 python .\scraper.py
 ```
 
 If `Get-ChildItem scraper.py, .env` says a file does not exist, you are in
 the wrong folder. Edit `.env` and run `python .\scraper.py` from the project
 folder, not from a parent folder such as `F:\Telegram app`.
+
+Use `python -m pip ...` instead of `pip ...` on Windows. It installs packages
+with the same Python that runs `scraper.py`, even if the standalone `pip`
+launcher points to an old or removed Python install.
 
 (On macOS/Linux, same idea: edit `.env` with any editor, then
 `python3 scraper.py`.)
