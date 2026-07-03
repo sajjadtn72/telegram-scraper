@@ -12,7 +12,7 @@ Setup:
 Usage:
     python scraper.py
     python scraper.py --channel mychannel --channel otherchannel
-    python scraper.py --format csv --download-media
+    python scraper.py --format csv --download-media --no-save-text
     python scraper.py --no-resume --limit 500
 """
 
@@ -71,6 +71,39 @@ def repair_dotenv_path(value: str) -> str:
     for escaped, literal in replacements.items():
         value = value.replace(escaped, literal)
     return value
+
+
+def prompt_yes_no(question: str, *, default: bool) -> bool:
+    suffix = " [Y/n]: " if default else " [y/N]: "
+    while True:
+        try:
+            answer = input(question + suffix).strip().lower()
+        except EOFError:
+            return default
+        if not answer:
+            return default
+        if answer in ("y", "yes"):
+            return True
+        if answer in ("n", "no"):
+            return False
+        print("Please answer y or n.")
+
+
+def prompt_output_format(default: str = "json") -> str:
+    choices = {"1": "json", "2": "csv", "3": "both",
+               "json": "json", "csv": "csv", "both": "both"}
+    while True:
+        try:
+            answer = input(
+                f"Output format: 1) json  2) csv  3) both [{default}]: "
+            ).strip().lower()
+        except EOFError:
+            return default
+        if not answer:
+            return default
+        if answer in choices:
+            return choices[answer]
+        print("Please choose 1, 2, 3, json, csv, or both.")
 
 
 # --------------------------------------------------------------------------- #
@@ -147,7 +180,7 @@ async def resolve_entity(client: TelegramClient, value: str):
 
 async def scrape_channel(client, entity, channel_label: str, *, min_id: int = 0,
                           limit: Optional[int] = None, download_media: bool,
-                          media_dir: Path) -> list:
+                          save_text: bool, media_dir: Path) -> list:
     """Fetch posts newer than min_id (0 = all history). Albums are merged into
     a single Post using the message that carries the caption."""
     log(f"[{channel_label}] Fetching messages"
@@ -170,7 +203,7 @@ async def scrape_channel(client, entity, channel_label: str, *, min_id: int = 0,
     media_count_total = 0
     for key, msgs in grouped.items():
         text_msg = next((m for m in msgs if m.text), msgs[-1])
-        text = text_msg.text or ""
+        text = (text_msg.text or "") if save_text else ""
         msg_id = text_msg.id
         iso_date = text_msg.date.astimezone(timezone.utc).isoformat()
 
@@ -257,6 +290,12 @@ def write_csv(path: Path, posts: list) -> None:
             writer.writerow(row)
 
 
+def apply_text_preference(posts: list, *, save_text: bool) -> list:
+    if save_text:
+        return posts
+    return [{**p, "text": ""} for p in posts]
+
+
 # --------------------------------------------------------------------------- #
 # Main
 # --------------------------------------------------------------------------- #
@@ -268,15 +307,37 @@ def parse_args():
                    help="Channel to scrape (repeatable). Defaults to CHANNELS in .env.")
     p.add_argument("--output-dir", default=None,
                    help="Output directory (default: 'output').")
-    p.add_argument("--format", choices=["json", "csv", "both"], default="json",
-                   help="Output format (default: json).")
+    p.add_argument("--format", choices=["json", "csv", "both"], default=None,
+                   help="Output format. If omitted, the script asks before starting.")
     p.add_argument("--download-media", action="store_true",
-                   help="Download photos/documents (off by default).")
+                   help="Download photos/documents without asking.")
+    p.add_argument("--save-text", action=argparse.BooleanOptionalAction, default=None,
+                   help="Save message text. If omitted, the script asks before starting.")
     p.add_argument("--limit", type=int, default=None,
                    help="Max messages to scan per channel (default: no limit).")
     p.add_argument("--no-resume", action="store_true",
                    help="Ignore any existing output and re-fetch full history.")
     return p.parse_args()
+
+
+def configure_run(args):
+    if sys.stdin.isatty():
+        download_media = args.download_media or prompt_yes_no(
+            "Download photos/files?", default=False)
+        save_text = args.save_text
+        if save_text is None:
+            save_text = prompt_yes_no("Save message texts?", default=True)
+        output_format = args.format or prompt_output_format("json")
+    else:
+        download_media = args.download_media
+        save_text = True if args.save_text is None else args.save_text
+        output_format = args.format or "json"
+
+    log("Options: "
+        f"media={'yes' if download_media else 'no'}, "
+        f"text={'yes' if save_text else 'no'}, "
+        f"format={output_format}")
+    return download_media, save_text, output_format
 
 
 async def main():
@@ -306,10 +367,14 @@ async def main():
     except OSError as e:
         fail(f"Invalid output directory path {output_dir_value!r}: {e}")
 
+    download_media, save_text, output_format = configure_run(args)
+
     client = TelegramClient(session_name, api_id, api_hash)
     client.flood_sleep_threshold = 60
     # phone=None falls back to Telethon's interactive "Please enter your phone" prompt.
     # If PHONE is set in .env, only the login code (sent via Telegram) is asked for.
+    log("If this is your first login, Telegram may take about 10 seconds "
+        "to show the code prompt. Check your Telegram app for the code.")
     await client.start(phone=phone)
     log("Client connected.")
 
@@ -321,7 +386,7 @@ async def main():
         json_path = output_dir / f"{safe_label}_posts.json"
         csv_path = output_dir / f"{safe_label}_posts.csv"
         media_dir = output_dir / safe_label / "media"
-        if args.download_media:
+        if download_media:
             media_dir.mkdir(parents=True, exist_ok=True)
 
         existing = [] if args.no_resume else load_existing(json_path)
@@ -334,17 +399,19 @@ async def main():
             new_posts = await scrape_channel(
                 client, entity, label,
                 min_id=min_id, limit=args.limit,
-                download_media=args.download_media, media_dir=media_dir,
+                download_media=download_media, save_text=save_text,
+                media_dir=media_dir,
             )
         except (ChatAdminRequiredError, ChannelPrivateError) as e:
             log(f"[{label}] Cannot access channel: {type(e).__name__}. Skipping.")
             continue
 
-        merged = merge_posts(existing, new_posts)
+        merged = apply_text_preference(merge_posts(existing, new_posts),
+                                       save_text=save_text)
 
-        if args.format in ("json", "both"):
+        if output_format in ("json", "both"):
             write_json(json_path, merged)
-        if args.format in ("csv", "both"):
+        if output_format in ("csv", "both"):
             write_csv(csv_path, merged)
 
         log(f"[{label}] Done: {len(new_posts)} new, {len(merged)} total posts "

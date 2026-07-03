@@ -74,11 +74,23 @@ values. You do not need to set a session name or output path.
 
 **Logging in the first time:** the script needs your phone number, and
 Telegram will send a login code to your Telegram app (not SMS necessarily —
-check the app). When you run `python scraper.py` the first time, it will ask
-you to type that code in the terminal. If your account has two-factor
-authentication (2FA) enabled, it will also ask for your password. After this
-first successful login, a `.session` file is created and you won't be asked
-again on future runs.
+check the app). After you run `python .\scraper.py`, it can take about 10
+seconds before the terminal asks for the code. Type the Telegram code in the
+same PowerShell window. If your account has two-factor authentication (2FA)
+enabled, it will also ask for your password. After this first successful
+login, a `.session` file is created and you won't be asked again on future
+runs.
+
+This is not hacking and it is not a security exploit. You log in through
+Telegram's official API credentials and approve access yourself. The script is
+read-only: it reads channels/groups you already have access to and does not
+send messages, edit messages, or join anything.
+
+Before scraping starts, the script asks:
+
+- whether to download photos/files
+- whether to save message text
+- which output format to write: `json`, `csv`, or `both`
 
 ## Usage
 
@@ -94,6 +106,9 @@ python scraper.py --format both
 
 # Download media too (off by default)
 python scraper.py --download-media
+
+# Skip message text and save only metadata/media info
+python scraper.py --no-save-text
 
 # Force a full re-scrape instead of resuming from the last saved post
 python scraper.py --no-resume
