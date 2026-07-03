@@ -116,6 +116,10 @@ class Post:
     date: str               # ISO 8601, UTC
     text: str
     media_count: int
+    sender_id: Optional[int] = None
+    sender_name: str = ""
+    sender_username: str = ""
+    sender_type: str = ""
     media_files: list = field(default_factory=list)
     reactions: int = 0
     views: Optional[int] = None
@@ -127,7 +131,8 @@ class Post:
         return self.id
 
 
-CSV_FIELDS = ["id", "date", "text", "media_count", "media_files",
+CSV_FIELDS = ["id", "date", "sender_id", "sender_name", "sender_username",
+              "sender_type", "text", "media_count", "media_files",
               "reactions", "views", "forwards", "link"]
 
 
@@ -174,6 +179,41 @@ async def resolve_entity(client: TelegramClient, value: str):
         return await client.get_entity(value)
 
 
+async def get_sender_info(msg) -> dict:
+    sender_id = getattr(msg, "sender_id", None)
+    sender_name = ""
+    sender_username = ""
+    sender_type = ""
+
+    try:
+        sender = await safe_call(lambda: msg.get_sender())
+    except Exception:
+        sender = None
+
+    if sender:
+        sender_id = sender_id or getattr(sender, "id", None)
+        sender_username = getattr(sender, "username", None) or ""
+        sender_type = type(sender).__name__
+
+        first_name = getattr(sender, "first_name", None) or ""
+        last_name = getattr(sender, "last_name", None) or ""
+        full_name = " ".join(part for part in (first_name, last_name) if part)
+        sender_name = (
+            full_name
+            or getattr(sender, "title", None)
+            or getattr(sender, "name", None)
+            or sender_username
+            or ""
+        )
+
+    return {
+        "sender_id": sender_id,
+        "sender_name": sender_name,
+        "sender_username": sender_username,
+        "sender_type": sender_type,
+    }
+
+
 # --------------------------------------------------------------------------- #
 # Scraping
 # --------------------------------------------------------------------------- #
@@ -206,6 +246,7 @@ async def scrape_channel(client, entity, channel_label: str, *, min_id: int = 0,
         text = (text_msg.text or "") if save_text else ""
         msg_id = text_msg.id
         iso_date = text_msg.date.astimezone(timezone.utc).isoformat()
+        sender_info = await get_sender_info(text_msg)
 
         media_files = []
         media_count = 0
@@ -238,6 +279,7 @@ async def scrape_channel(client, entity, channel_label: str, *, min_id: int = 0,
             date=iso_date,
             text=text,
             media_count=media_count,
+            **sender_info,
             media_files=media_files,
             reactions=reactions,
             views=getattr(text_msg, "views", None),

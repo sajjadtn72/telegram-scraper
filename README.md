@@ -23,6 +23,8 @@ gauge its health (activity level, most active members, engagement trends).
   than the last saved id and merges them into the existing file. Use
   `--no-resume` to force a full re-scrape.
 - **JSON and/or CSV output** (`--format json|csv|both`).
+- **Sender info for groups** — saves sender id/name/username when Telegram
+  exposes it, so AI tools can analyze who said what in group exports.
 - **Media download is opt-in** (`--download-media`) — by default only a
   `media_count` is recorded, nothing is downloaded.
 - **Album-aware** — grouped photos/videos are merged into a single post
@@ -128,6 +130,10 @@ there:
   {
     "id": 123,
     "date": "2026-07-02T10:00:00+00:00",
+    "sender_id": 123456789,
+    "sender_name": "Example User",
+    "sender_username": "exampleuser",
+    "sender_type": "User",
     "text": "full post text, not truncated",
     "media_count": 1,
     "media_files": ["123_124.jpg"],
@@ -146,6 +152,9 @@ If `--download-media` is set, photos and files are saved under
 
 - Resume matching is by message id; if a post is edited after being scraped,
   re-running will not pick up the edit (only new posts are fetched).
+- Sender fields are saved for newly scraped messages. If you already exported
+  a group before this feature existed, run with `--no-resume` to rebuild the
+  output with sender details.
 - Private channels require the logged-in account to already be a member.
 - Be patient on large channels — the script respects Telegram's flood-wait
   limits and will sleep when asked to.
