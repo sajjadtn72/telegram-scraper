@@ -5,9 +5,12 @@ Fetches all posts from one or more Telegram channels and saves them as JSON
 and/or CSV. Supports incremental (resume) runs, optional media download, and
 multiple channels in a single invocation.
 
+All settings are read from the .env file — no interactive prompts are needed
+(except the one-time Telegram login code on first run).
+
 Setup:
     python -m pip install -r requirements.txt
-    edit .env                   # fill in API_ID / API_HASH / PHONE / CHANNELS
+    edit .env      # fill in API_ID, API_HASH, PHONE, CHANNELS, etc.
 
 Usage:
     python scraper.py
@@ -72,53 +75,6 @@ def repair_dotenv_path(value: str) -> str:
         value = value.replace(escaped, literal)
     return value
 
-
-def prompt_yes_no(question: str, *, default: bool) -> bool:
-    suffix = " [Y/n]: " if default else " [y/N]: "
-    while True:
-        try:
-            answer = input(question + suffix).strip().lower()
-        except EOFError:
-            return default
-        if not answer:
-            return default
-        if answer in ("y", "yes"):
-            return True
-        if answer in ("n", "no"):
-            return False
-        print("Please answer y or n.")
-
-
-def prompt_output_format(default: str = "json") -> str:
-    choices = {"1": "json", "2": "csv", "3": "both",
-               "json": "json", "csv": "csv", "both": "both"}
-    while True:
-        try:
-            answer = input(
-                f"Output format: 1) json  2) csv  3) both [{default}]: "
-            ).strip().lower()
-        except EOFError:
-            return default
-        if not answer:
-            return default
-        if answer in choices:
-            return choices[answer]
-        print("Please choose 1, 2, 3, json, csv, or both.")
-
-
-def prompt_channels() -> list:
-    while True:
-        try:
-            answer = input(
-                "Channel/group username, link, invite link, or numeric id "
-                "(comma-separated for multiple): "
-            ).strip()
-        except EOFError:
-            return []
-        channels = [c.strip() for c in answer.split(",") if c.strip()]
-        if channels:
-            return channels
-        print("Please enter at least one channel or group.")
 
 
 # --------------------------------------------------------------------------- #
@@ -378,17 +334,13 @@ def parse_args():
 
 
 def configure_run(args):
-    if sys.stdin.isatty():
-        download_media = args.download_media or prompt_yes_no(
-            "Download photos/files?", default=False)
-        save_text = args.save_text
-        if save_text is None:
-            save_text = prompt_yes_no("Save message texts?", default=True)
-        output_format = args.format or prompt_output_format("json")
-    else:
-        download_media = args.download_media
-        save_text = True if args.save_text is None else args.save_text
-        output_format = args.format or "json"
+    # All options come from CLI flags with sensible defaults.
+    # No interactive prompts.
+    download_media = args.download_media
+
+    save_text = True if args.save_text is None else args.save_text
+
+    output_format = args.format or "both"
 
     log("Options: "
         f"media={'yes' if download_media else 'no'}, "
@@ -415,10 +367,7 @@ async def main():
         c.strip() for c in (os.getenv("CHANNELS") or "").split(",") if c.strip()
     ]
     if not channels:
-        if sys.stdin.isatty():
-            channels = prompt_channels()
-        if not channels:
-            fail("No channels given. Use --channel or set CHANNELS in .env.")
+        fail("No channels given. Use --channel or set CHANNELS in .env.")
 
     output_dir_value = args.output_dir or "output"
     output_dir = Path(repair_dotenv_path(output_dir_value))

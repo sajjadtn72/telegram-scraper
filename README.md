@@ -56,7 +56,7 @@ launcher points to an old or removed Python install.
 
 ## Configure `.env`
 
-The repository already includes `.env`. Edit only these four values:
+The repository includes a `.env` file. Edit these values:
 
 ```env
 API_ID = 123456
@@ -65,17 +65,19 @@ PHONE = "+98"
 CHANNELS = ""
 ```
 
-`API_ID` is a number and does not need quotes. Keep quotes around the text
-values. You do not need to set a session name or output path.
-
 | Key | Meaning |
 |---|---|
 | `API_ID`, `API_HASH` | From https://my.telegram.org → API development tools |
 | `PHONE` | Your Telegram phone number with country code — required to log in |
 | `CHANNELS` | Comma-separated list of channels **or groups** (username, link, or numeric id) |
 
-You can leave `CHANNELS = ""` empty. If it is empty, the script asks for the
-channel/group in PowerShell when you run it.
+**The script does not ask any questions in the terminal.** Channels are read
+from `.env`, and runtime options (output format, media download, text saving)
+are controlled via command-line flags with sensible defaults:
+
+- Output format defaults to **both** (JSON + CSV)
+- Media download is **off** by default (`--download-media` to enable)
+- Message text is **saved** by default (`--no-save-text` to disable)
 
 **Logging in the first time:** the script needs your phone number, and
 Telegram will send a login code to your Telegram app (not SMS necessarily —
@@ -90,12 +92,6 @@ This is not hacking and it is not a security exploit. You log in through
 Telegram's official API credentials and approve access yourself. The script is
 read-only: it reads channels/groups you already have access to and does not
 send messages, edit messages, or join anything.
-
-Before scraping starts, the script asks:
-
-- whether to download photos/files
-- whether to save message text
-- which output format to write: `json`, `csv`, or `both`
 
 ## Usage
 
@@ -151,9 +147,9 @@ there:
 If `--download-media` is set, photos and files are saved under
 `output/<channel>/media/`.
 
-If you already scraped a channel without media, run the script again and
-answer `y` to photos/files. It will scan the saved history too and skip files
-that already exist.
+If you already scraped a channel without media, set `DOWNLOAD_MEDIA = "true"`
+in `.env` and run the script again. It will scan the saved history too and
+skip files that already exist.
 
 ## Notes & limitations
 
