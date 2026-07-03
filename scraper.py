@@ -432,15 +432,20 @@ async def main():
             media_dir.mkdir(parents=True, exist_ok=True)
 
         existing = [] if args.no_resume else load_existing(json_path)
-        min_id = max((p["id"] for p in existing), default=0) if existing else 0
+        resume_min_id = max((p["id"] for p in existing), default=0) if existing else 0
+        scrape_min_id = 0 if download_media else resume_min_id
         if existing:
             log(f"[{label}] Resuming: {len(existing)} posts already saved "
-                f"(newest id={min_id}).")
+                f"(newest id={resume_min_id}).")
+            if download_media:
+                log(f"[{label}] Media download requested; scanning full history "
+                    "to download media from already saved posts. Existing files "
+                    "will be skipped.")
 
         try:
             new_posts = await scrape_channel(
                 client, entity, label,
-                min_id=min_id, limit=args.limit,
+                min_id=scrape_min_id, limit=args.limit,
                 download_media=download_media, save_text=save_text,
                 media_dir=media_dir,
             )
@@ -456,7 +461,8 @@ async def main():
         if output_format in ("csv", "both"):
             write_csv(csv_path, merged)
 
-        log(f"[{label}] Done: {len(new_posts)} new, {len(merged)} total posts "
+        new_count = sum(1 for p in new_posts if p.id > resume_min_id)
+        log(f"[{label}] Done: {new_count} new, {len(merged)} total posts "
             f"saved to '{output_dir}/'.")
 
     await client.disconnect()

@@ -148,6 +148,10 @@ there:
 If `--download-media` is set, photos and files are saved under
 `output/<channel>/media/`.
 
+If you already scraped a channel without media, run the script again and
+answer `y` to photos/files. It will scan the saved history too and skip files
+that already exist.
+
 ## Notes & limitations
 
 - Resume matching is by message id; if a post is edited after being scraped,
