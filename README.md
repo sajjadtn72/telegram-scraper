@@ -74,6 +74,9 @@ values. You do not need to set a session name or output path.
 | `PHONE` | Your Telegram phone number with country code — required to log in |
 | `CHANNELS` | Comma-separated list of channels **or groups** (username, link, or numeric id) |
 
+You can leave `CHANNELS = ""` empty. If it is empty, the script asks for the
+channel/group in PowerShell when you run it.
+
 **Logging in the first time:** the script needs your phone number, and
 Telegram will send a login code to your Telegram app (not SMS necessarily —
 check the app). After you run `python .\scraper.py`, it can take about 10

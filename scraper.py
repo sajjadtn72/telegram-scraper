@@ -106,6 +106,21 @@ def prompt_output_format(default: str = "json") -> str:
         print("Please choose 1, 2, 3, json, csv, or both.")
 
 
+def prompt_channels() -> list:
+    while True:
+        try:
+            answer = input(
+                "Channel/group username, link, invite link, or numeric id "
+                "(comma-separated for multiple): "
+            ).strip()
+        except EOFError:
+            return []
+        channels = [c.strip() for c in answer.split(",") if c.strip()]
+        if channels:
+            return channels
+        print("Please enter at least one channel or group.")
+
+
 # --------------------------------------------------------------------------- #
 # Data model
 # --------------------------------------------------------------------------- #
@@ -400,7 +415,10 @@ async def main():
         c.strip() for c in (os.getenv("CHANNELS") or "").split(",") if c.strip()
     ]
     if not channels:
-        fail("No channels given. Use --channel or set CHANNELS in .env.")
+        if sys.stdin.isatty():
+            channels = prompt_channels()
+        if not channels:
+            fail("No channels given. Use --channel or set CHANNELS in .env.")
 
     output_dir_value = args.output_dir or "output"
     output_dir = Path(repair_dotenv_path(output_dir_value))
