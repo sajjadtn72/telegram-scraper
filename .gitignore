@@ -1,0 +1,13 @@
+# Secrets & session — never commit these
+.env
+*.session
+*.session-journal
+
+# Scraped output (regenerate by running the scraper)
+output/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

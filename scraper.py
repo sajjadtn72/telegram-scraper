@@ -1,0 +1,330 @@
+"""
+Telegram channel scraper (Telethon).
+
+Fetches all posts from one or more Telegram channels and saves them as JSON
+and/or CSV. Supports incremental (resume) runs, optional media download, and
+multiple channels in a single invocation.
+
+Setup:
+    pip install -r requirements.txt
+    copy .env.example .env      # then fill in API_ID / API_HASH / CHANNELS
+
+Usage:
+    python scraper.py
+    python scraper.py --channel mychannel --channel otherchannel
+    python scraper.py --format csv --download-media
+    python scraper.py --no-resume --limit 500
+"""
+
+import argparse
+import asyncio
+import csv
+import json
+import os
+import sys
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+from dotenv import load_dotenv
+from telethon import TelegramClient
+from telethon.errors import ChannelPrivateError, ChatAdminRequiredError, FloodWaitError
+from telethon.tl.functions.messages import CheckChatInviteRequest
+from telethon.tl.types import (
+    ChatInviteAlready,
+    ChatInvitePeek,
+    MessageMediaDocument,
+    MessageMediaPhoto,
+)
+
+# Persian/emoji text crashes the default Windows console (cp1252); force UTF-8.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+load_dotenv()
+
+
+def log(msg: str) -> None:
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
+
+
+def fail(msg: str) -> None:
+    print(f"ERROR: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+# --------------------------------------------------------------------------- #
+# Data model
+# --------------------------------------------------------------------------- #
+
+@dataclass
+class Post:
+    id: int
+    date: str               # ISO 8601, UTC
+    text: str
+    media_count: int
+    media_files: list = field(default_factory=list)
+    reactions: int = 0
+    views: Optional[int] = None
+    forwards: Optional[int] = None
+    link: str = ""
+
+    @property
+    def sort_key(self):
+        return self.id
+
+
+CSV_FIELDS = ["id", "date", "text", "media_count", "media_files",
+              "reactions", "views", "forwards", "link"]
+
+
+# --------------------------------------------------------------------------- #
+# Flood-wait safe request wrapper
+# --------------------------------------------------------------------------- #
+
+async def safe_call(coro_factory, *, retries: int = 5):
+    for attempt in range(retries):
+        try:
+            return await coro_factory()
+        except FloodWaitError as e:
+            wait = e.seconds + 1
+            log(f"  FloodWait: sleeping {wait}s (attempt {attempt + 1}/{retries})")
+            await asyncio.sleep(wait)
+    raise RuntimeError("Exceeded flood-wait retries")
+
+
+# --------------------------------------------------------------------------- #
+# Entity resolution
+# --------------------------------------------------------------------------- #
+
+async def resolve_entity(client: TelegramClient, value: str):
+    value = value.strip()
+    if not value:
+        fail("Empty channel value.")
+
+    if "t.me/+" in value or "joinchat" in value or value.startswith("+"):
+        invite_hash = value.split("+")[-1].split("/")[-1]
+        log(f"Resolving private invite (hash={invite_hash}) ...")
+        invite = await safe_call(lambda: client(CheckChatInviteRequest(invite_hash)))
+        if isinstance(invite, (ChatInviteAlready, ChatInvitePeek)):
+            return await client.get_entity(invite.chat)
+        fail(f"Not a member of the private channel behind {value!r} yet. "
+             "Join it with this account first, then re-run.")
+
+    if "t.me/" in value:
+        value = value.rstrip("/").split("/")[-1]
+    value = value.lstrip("@")
+
+    try:
+        return await client.get_entity(int(value))
+    except ValueError:
+        return await client.get_entity(value)
+
+
+# --------------------------------------------------------------------------- #
+# Scraping
+# --------------------------------------------------------------------------- #
+
+async def scrape_channel(client, entity, channel_label: str, *, min_id: int = 0,
+                          limit: Optional[int] = None, download_media: bool,
+                          media_dir: Path) -> list:
+    """Fetch posts newer than min_id (0 = all history). Albums are merged into
+    a single Post using the message that carries the caption."""
+    log(f"[{channel_label}] Fetching messages"
+        + (f" newer than id={min_id}" if min_id else " (full history)")
+        + (f", limit={limit}" if limit else "") + " ...")
+
+    grouped = {}
+    count = 0
+    async for msg in client.iter_messages(entity, limit=limit, min_id=min_id):
+        gid = getattr(msg, "grouped_id", None)
+        key = gid if gid else f"single_{msg.id}"
+        grouped.setdefault(key, []).append(msg)
+        count += 1
+        if count % 500 == 0:
+            log(f"[{channel_label}]  ...{count} raw messages scanned")
+
+    log(f"[{channel_label}] {count} raw messages -> {len(grouped)} post groups")
+
+    posts = []
+    media_count_total = 0
+    for key, msgs in grouped.items():
+        text_msg = next((m for m in msgs if m.text), msgs[-1])
+        text = text_msg.text or ""
+        msg_id = text_msg.id
+        iso_date = text_msg.date.astimezone(timezone.utc).isoformat()
+
+        media_files = []
+        media_count = 0
+        for m in msgs:
+            if m.media and isinstance(m.media, (MessageMediaPhoto, MessageMediaDocument)):
+                media_count += 1
+                if download_media:
+                    fname = f"{msg_id}_{m.id}.jpg"
+                    fpath = media_dir / fname
+                    if not fpath.exists():
+                        try:
+                            await safe_call(
+                                lambda m=m, fpath=fpath: client.download_media(m.media, file=str(fpath)))
+                            media_count_total += 1
+                        except Exception as e:
+                            log(f"[{channel_label}]  media download failed for "
+                                f"msg {m.id}: {type(e).__name__}")
+                            continue
+                    media_files.append(fname)
+
+        reactions = 0
+        if text_msg.reactions and text_msg.reactions.results:
+            reactions = sum(r.count for r in text_msg.reactions.results)
+
+        username = getattr(entity, "username", None)
+        link = f"https://t.me/{username}/{msg_id}" if username else ""
+
+        posts.append(Post(
+            id=msg_id,
+            date=iso_date,
+            text=text,
+            media_count=media_count,
+            media_files=media_files,
+            reactions=reactions,
+            views=getattr(text_msg, "views", None),
+            forwards=getattr(text_msg, "forwards", None),
+            link=link,
+        ))
+
+    posts.sort(key=lambda p: p.sort_key)
+    if download_media:
+        log(f"[{channel_label}] Downloaded {media_count_total} new media files.")
+    return posts
+
+
+# --------------------------------------------------------------------------- #
+# Persistence (resume support)
+# --------------------------------------------------------------------------- #
+
+def load_existing(json_path: Path) -> list:
+    if not json_path.exists():
+        return []
+    try:
+        with open(json_path, encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        log(f"Could not read existing {json_path.name} ({type(e).__name__}); "
+            "starting fresh.")
+        return []
+
+
+def merge_posts(existing: list, new_posts: list) -> list:
+    by_id = {p["id"]: p for p in existing}
+    for p in new_posts:
+        by_id[p.id] = asdict(p)
+    return sorted(by_id.values(), key=lambda p: p["id"])
+
+
+def write_json(path: Path, posts: list) -> None:
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(posts, f, ensure_ascii=False, indent=2)
+
+
+def write_csv(path: Path, posts: list) -> None:
+    with open(path, "w", encoding="utf-8-sig", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
+        writer.writeheader()
+        for p in posts:
+            row = {k: p.get(k, "") for k in CSV_FIELDS}
+            if isinstance(row["media_files"], list):
+                row["media_files"] = "|".join(row["media_files"])
+            writer.writerow(row)
+
+
+# --------------------------------------------------------------------------- #
+# Main
+# --------------------------------------------------------------------------- #
+
+def parse_args():
+    p = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--channel", "-c", action="append", dest="channels",
+                   help="Channel to scrape (repeatable). Defaults to CHANNELS in .env.")
+    p.add_argument("--output-dir", default=None,
+                   help="Output directory (defaults to OUTPUT_DIR in .env or 'output').")
+    p.add_argument("--format", choices=["json", "csv", "both"], default="json",
+                   help="Output format (default: json).")
+    p.add_argument("--download-media", action="store_true",
+                   help="Download photos/documents (off by default).")
+    p.add_argument("--limit", type=int, default=None,
+                   help="Max messages to scan per channel (default: no limit).")
+    p.add_argument("--no-resume", action="store_true",
+                   help="Ignore any existing output and re-fetch full history.")
+    return p.parse_args()
+
+
+async def main():
+    args = parse_args()
+
+    api_id = os.getenv("API_ID")
+    api_hash = os.getenv("API_HASH")
+    session_name = os.getenv("SESSION_NAME", "session")
+    if not api_id or not api_hash:
+        fail("API_ID / API_HASH missing. Copy .env.example to .env and fill it in.")
+
+    channels = args.channels or [
+        c.strip() for c in os.getenv("CHANNELS", "").split(",") if c.strip()
+    ]
+    if not channels:
+        fail("No channels given. Use --channel or set CHANNELS in .env.")
+
+    output_dir = Path(args.output_dir or os.getenv("OUTPUT_DIR", "output"))
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    client = TelegramClient(session_name, int(api_id), api_hash)
+    client.flood_sleep_threshold = 60
+    await client.start()
+    log("Client connected.")
+
+    for raw_channel in channels:
+        entity = await resolve_entity(client, raw_channel)
+        label = getattr(entity, "username", None) or getattr(entity, "title", raw_channel)
+        safe_label = "".join(c if c.isalnum() or c in "-_." else "_" for c in str(label))
+
+        json_path = output_dir / f"{safe_label}_posts.json"
+        csv_path = output_dir / f"{safe_label}_posts.csv"
+        media_dir = output_dir / safe_label / "media"
+        if args.download_media:
+            media_dir.mkdir(parents=True, exist_ok=True)
+
+        existing = [] if args.no_resume else load_existing(json_path)
+        min_id = max((p["id"] for p in existing), default=0) if existing else 0
+        if existing:
+            log(f"[{label}] Resuming: {len(existing)} posts already saved "
+                f"(newest id={min_id}).")
+
+        try:
+            new_posts = await scrape_channel(
+                client, entity, label,
+                min_id=min_id, limit=args.limit,
+                download_media=args.download_media, media_dir=media_dir,
+            )
+        except (ChatAdminRequiredError, ChannelPrivateError) as e:
+            log(f"[{label}] Cannot access channel: {type(e).__name__}. Skipping.")
+            continue
+
+        merged = merge_posts(existing, new_posts)
+
+        if args.format in ("json", "both"):
+            write_json(json_path, merged)
+        if args.format in ("csv", "both"):
+            write_csv(csv_path, merged)
+
+        log(f"[{label}] Done: {len(new_posts)} new, {len(merged)} total posts "
+            f"saved to '{output_dir}/'.")
+
+    await client.disconnect()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
