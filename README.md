@@ -71,13 +71,14 @@ CHANNELS = ""
 | `PHONE` | Your Telegram phone number with country code — required to log in |
 | `CHANNELS` | Comma-separated list of channels **or groups** (username, link, or numeric id) |
 
-**The script does not ask any questions in the terminal.** Channels are read
-from `.env`, and runtime options (output format, media download, text saving)
-are controlled via command-line flags with sensible defaults:
+Channels are read from `.env` — the script does not ask for them in the
+terminal. Before scraping starts, the script asks:
 
-- Output format defaults to **both** (JSON + CSV)
-- Media download is **off** by default (`--download-media` to enable)
-- Message text is **saved** by default (`--no-save-text` to disable)
+- whether to download photos/files
+- whether to save message text
+- which output format to write: `json`, `csv`, or `both`
+
+These can also be set via command-line flags to skip the prompts (see Usage).
 
 **Logging in the first time:** the script needs your phone number, and
 Telegram will send a login code to your Telegram app (not SMS necessarily —

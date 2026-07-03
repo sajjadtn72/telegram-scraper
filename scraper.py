@@ -76,6 +76,38 @@ def repair_dotenv_path(value: str) -> str:
     return value
 
 
+def prompt_yes_no(question: str, *, default: bool) -> bool:
+    suffix = " [Y/n]: " if default else " [y/N]: "
+    while True:
+        try:
+            answer = input(question + suffix).strip().lower()
+        except EOFError:
+            return default
+        if not answer:
+            return default
+        if answer in ("y", "yes"):
+            return True
+        if answer in ("n", "no"):
+            return False
+        print("Please answer y or n.")
+
+
+def prompt_output_format(default: str = "json") -> str:
+    choices = {"1": "json", "2": "csv", "3": "both",
+               "json": "json", "csv": "csv", "both": "both"}
+    while True:
+        try:
+            answer = input(
+                f"Output format: 1) json  2) csv  3) both [{default}]: "
+            ).strip().lower()
+        except EOFError:
+            return default
+        if not answer:
+            return default
+        if answer in choices:
+            return choices[answer]
+        print("Please choose 1, 2, 3, json, csv, or both.")
+
 
 # --------------------------------------------------------------------------- #
 # Data model
@@ -334,13 +366,17 @@ def parse_args():
 
 
 def configure_run(args):
-    # All options come from CLI flags with sensible defaults.
-    # No interactive prompts.
-    download_media = args.download_media
-
-    save_text = True if args.save_text is None else args.save_text
-
-    output_format = args.format or "both"
+    if sys.stdin.isatty():
+        download_media = args.download_media or prompt_yes_no(
+            "Download photos/files?", default=False)
+        save_text = args.save_text
+        if save_text is None:
+            save_text = prompt_yes_no("Save message texts?", default=True)
+        output_format = args.format or prompt_output_format("json")
+    else:
+        download_media = args.download_media
+        save_text = True if args.save_text is None else args.save_text
+        output_format = args.format or "both"
 
     log("Options: "
         f"media={'yes' if download_media else 'no'}, "
