@@ -37,26 +37,32 @@
 
 ## نصب و اجرا (ویندوز / PowerShell)
 
-پاورشل رو توی پوشه‌ی پروژه باز کن و این دستورات رو **دقیقاً به همین ترتیب** بزن:
+پاورشل رو توی پوشه‌ای باز کن که فایل‌های `scraper.py` و `.env.example` داخلش هستند، بعد این دستورات رو بزن:
 
 ```powershell
-cd path\to\telegram-channel-scraper
+cd "path\to\telegram-channel-scraper"
+Get-ChildItem scraper.py, .env.example
 pip install -r requirements.txt
-copy .env.example .env
-notepad .env          # مقادیر خودت رو جایگزین کن (پایین‌تر توضیح داده شده) — بعد Save و ببندش
-python scraper.py
+Copy-Item .env.example .env
+notepad .env          # یا با هر ادیتور دیگری .env رو باز کن، تغییر بده، Save کن و ببند
+python .\scraper.py
 ```
 
 > `cd path\to\telegram-channel-scraper` رو با مسیر واقعی پوشه‌ای که پروژه رو
 > توش clone/دانلود کردی جایگزین کن. مثلاً اگه پروژه توی
 > `F:\telegram-channel-scraper` هست، بنویس: `cd F:\telegram-channel-scraper`
+>
+> اگر `Get-ChildItem scraper.py, .env.example` خطا داد، یعنی داخل پوشه‌ی
+> اشتباه هستی. دستورهای `Copy-Item .env.example .env` و `python .\scraper.py`
+> باید دقیقاً داخل پوشه‌ی خود پروژه اجرا شوند، نه پوشه‌ی بالاتر مثل
+> `F:\Telegram app`.
 
 ## تنظیم فایل `.env`
 
-بعد از دستور `notepad .env`، این فایل باز می‌شه:
+بعد از ساختن `.env`، این فایل رو با Notepad یا هر ادیتور دیگری باز کن:
 
 ```env
-API_ID = ""
+API_ID = 123456
 API_HASH = ""
 PHONE = "+98"
 SESSION_NAME = "my_session"
@@ -64,7 +70,8 @@ CHANNELS = ""
 OUTPUT_DIR = "output"
 ```
 
-فقط مقدار **داخل گیومه‌ها** رو با اطلاعات خودت پر کن (خود گیومه‌ها رو پاک نکن):
+`API_ID` عددی است و گیومه نمی‌خواهد. برای مقدارهای متنی مثل `API_HASH`،
+`PHONE`، `CHANNELS` و `OUTPUT_DIR` بهتر است گیومه‌ها را نگه داری.
 
 | کلید | توضیح |
 |---|---|

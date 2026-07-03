@@ -32,31 +32,40 @@ gauge its health (activity level, most active members, engagement trends).
 
 ## Install & run (Windows / PowerShell)
 
-Open PowerShell in the project folder and run:
+Open PowerShell in the folder that contains `scraper.py`, then run:
 
 ```powershell
-cd path\to\telegram-channel-scraper
+cd "path\to\telegram-channel-scraper"
+Get-ChildItem scraper.py, .env.example
 pip install -r requirements.txt
-copy .env.example .env
-notepad .env          # fill in your own values, see below — then save & close
-python scraper.py
+Copy-Item .env.example .env
+notepad .env          # or edit .env with any editor, then save and close
+python .\scraper.py
 ```
+
+If `Get-ChildItem scraper.py, .env.example` says a file does not exist, you
+are in the wrong folder. `Copy-Item .env.example .env` and `python .\scraper.py`
+must be run from the project folder, not from a parent folder such as
+`F:\Telegram app`.
 
 (On macOS/Linux, same idea: `cp .env.example .env`, edit it with any editor,
 then `python3 scraper.py`.)
 
 ## Configure `.env`
 
-Edit the values between the quotes — don't remove the quotes themselves:
+Edit `.env` with Notepad or any other editor:
 
 ```env
-API_ID = ""
+API_ID = 123456
 API_HASH = ""
 PHONE = "+98"
 SESSION_NAME = "my_session"
 CHANNELS = ""
 OUTPUT_DIR = "output"
 ```
+
+`API_ID` is a number and does not need quotes. String values can be quoted;
+the examples keep quotes where they help avoid mistakes.
 
 | Key | Meaning |
 |---|---|
