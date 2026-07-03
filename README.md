@@ -1,11 +1,19 @@
 # telegram-channel-scraper
 
-A small Telethon-based CLI that scrapes all posts from one or more public or
-private Telegram channels into JSON/CSV — with incremental (resume) runs,
-optional media download, and multi-channel support in a single invocation.
+**[راهنمای فارسی](README.fa.md)**
 
-> Read-only: it only reads posts from channels you already have access to.
-> It never posts, edits, or joins anything on your behalf.
+A small Telethon-based CLI that scrapes all messages from one or more public
+or private Telegram **channels or groups** into JSON/CSV — with incremental
+(resume) runs, optional media download, and multi-target support in a single
+invocation.
+
+Works on channels, regular groups, and supergroups alike — including a
+private group you belong to. That makes it useful not just for archiving a
+channel's posts, but also for pulling a personal group's message history to
+gauge its health (activity level, most active members, engagement trends).
+
+> Read-only: it only reads messages from channels/groups you already have
+> access to. It never posts, edits, or joins anything on your behalf.
 
 ## Features
 
@@ -40,7 +48,7 @@ Edit `.env`:
 |---|---|
 | `API_ID`, `API_HASH` | From https://my.telegram.org → API development tools |
 | `SESSION_NAME` | Telethon session file name (created on first login if missing) |
-| `CHANNELS` | Comma-separated list of channels (username, link, or numeric id) |
+| `CHANNELS` | Comma-separated list of channels **or groups** (username, link, or numeric id) |
 | `OUTPUT_DIR` | Where JSON/CSV/media get written (default: `output/`) |
 
 First run will prompt for your phone number, the login code, and (if enabled)
@@ -52,8 +60,8 @@ your 2FA password, then save a `.session` file so future runs don't ask again.
 # Scrape everything in CHANNELS from .env, save as JSON
 python scraper.py
 
-# Scrape specific channels, ignoring .env
-python scraper.py --channel mychannel --channel https://t.me/otherchannel
+# Scrape specific channels or groups, ignoring .env (mix freely)
+python scraper.py --channel mychannel --channel https://t.me/mygroup
 
 # Also write CSV
 python scraper.py --format both
