@@ -1,5 +1,4 @@
-# Secrets & session — never commit these
-.env
+# Session files contain login access; never commit these.
 *.session
 *.session-journal
 

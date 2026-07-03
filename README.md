@@ -36,42 +36,37 @@ Open PowerShell in the folder that contains `scraper.py`, then run:
 
 ```powershell
 cd "path\to\telegram-channel-scraper"
-Get-ChildItem scraper.py
+Get-ChildItem scraper.py, .env
 pip install -r requirements.txt
 python .\scraper.py
 ```
 
-If `Get-ChildItem scraper.py` says the file does not exist, you are in the
-wrong folder. Create `.env` and run `python .\scraper.py` from the project
+If `Get-ChildItem scraper.py, .env` says a file does not exist, you are in
+the wrong folder. Edit `.env` and run `python .\scraper.py` from the project
 folder, not from a parent folder such as `F:\Telegram app`.
 
-(On macOS/Linux, same idea: create `.env` with any editor, then
+(On macOS/Linux, same idea: edit `.env` with any editor, then
 `python3 scraper.py`.)
 
 ## Configure `.env`
 
-Create a `.env` file in the same folder as `scraper.py`, then put this inside
-it with your own values:
+The repository already includes `.env`. Edit only these four values:
 
 ```env
 API_ID = 123456
 API_HASH = ""
 PHONE = "+98"
-SESSION_NAME = "my_session"
 CHANNELS = ""
-OUTPUT_DIR = "output"
 ```
 
-`API_ID` is a number and does not need quotes. String values can be quoted;
-the examples keep quotes where they help avoid mistakes.
+`API_ID` is a number and does not need quotes. Keep quotes around the text
+values. You do not need to set a session name or output path.
 
 | Key | Meaning |
 |---|---|
 | `API_ID`, `API_HASH` | From https://my.telegram.org → API development tools |
 | `PHONE` | Your Telegram phone number with country code — required to log in |
-| `SESSION_NAME` | Any name you like for the session file (created on first login) |
 | `CHANNELS` | Comma-separated list of channels **or groups** (username, link, or numeric id) |
-| `OUTPUT_DIR` | Where JSON/CSV/media get written (default: `output/`) |
 
 **Logging in the first time:** the script needs your phone number, and
 Telegram will send a login code to your Telegram app (not SMS necessarily —
@@ -105,7 +100,9 @@ python scraper.py --limit 200
 
 ## Output
 
-For each channel, two files are written to `OUTPUT_DIR`:
+After you run the script, an `output` folder is created in the same folder
+where you ran `python .\scraper.py`. For each channel, files are written
+there:
 
 - `<channel>_posts.json` — array of posts:
   ```json
@@ -123,8 +120,8 @@ For each channel, two files are written to `OUTPUT_DIR`:
   ```
 - `<channel>_posts.csv` — same fields, flattened (only with `--format csv|both`).
 
-If `--download-media` is set, files are saved under
-`OUTPUT_DIR/<channel>/media/`.
+If `--download-media` is set, photos and files are saved under
+`output/<channel>/media/`.
 
 ## Notes & limitations
 
@@ -133,8 +130,7 @@ If `--download-media` is set, files are saved under
 - Private channels require the logged-in account to already be a member.
 - Be patient on large channels — the script respects Telegram's flood-wait
   limits and will sleep when asked to.
-- Keep `.env` and your `.session` file private — both are excluded via
-  `.gitignore`.
+- Keep your `.session` file private — it is excluded via `.gitignore`.
 
 ## License
 

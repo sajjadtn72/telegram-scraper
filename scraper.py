@@ -7,7 +7,7 @@ multiple channels in a single invocation.
 
 Setup:
     pip install -r requirements.txt
-    create .env                 # fill in API_ID / API_HASH / CHANNELS
+    edit .env                   # fill in API_ID / API_HASH / PHONE / CHANNELS
 
 Usage:
     python scraper.py
@@ -267,7 +267,7 @@ def parse_args():
     p.add_argument("--channel", "-c", action="append", dest="channels",
                    help="Channel to scrape (repeatable). Defaults to CHANNELS in .env.")
     p.add_argument("--output-dir", default=None,
-                   help="Output directory (defaults to OUTPUT_DIR in .env or 'output').")
+                   help="Output directory (default: 'output').")
     p.add_argument("--format", choices=["json", "csv", "both"], default="json",
                    help="Output format (default: json).")
     p.add_argument("--download-media", action="store_true",
@@ -285,9 +285,9 @@ async def main():
     api_id = (os.getenv("API_ID") or "").strip()
     api_hash = (os.getenv("API_HASH") or "").strip()
     phone = (os.getenv("PHONE") or "").strip() or None
-    session_name = (os.getenv("SESSION_NAME") or "").strip() or "session"
+    session_name = "session"
     if not api_id or not api_hash:
-        fail("API_ID / API_HASH missing. Create a .env file and fill them in.")
+        fail("API_ID / API_HASH missing. Edit .env and fill them in.")
     try:
         api_id = int(api_id)
     except ValueError:
@@ -299,12 +299,12 @@ async def main():
     if not channels:
         fail("No channels given. Use --channel or set CHANNELS in .env.")
 
-    output_dir_value = args.output_dir or (os.getenv("OUTPUT_DIR") or "").strip() or "output"
+    output_dir_value = args.output_dir or "output"
     output_dir = Path(repair_dotenv_path(output_dir_value))
     try:
         output_dir.mkdir(parents=True, exist_ok=True)
     except OSError as e:
-        fail(f"Invalid OUTPUT_DIR path {output_dir_value!r}: {e}")
+        fail(f"Invalid output directory path {output_dir_value!r}: {e}")
 
     client = TelegramClient(session_name, api_id, api_hash)
     client.flood_sleep_threshold = 60
