@@ -57,6 +57,22 @@ def fail(msg: str) -> None:
     sys.exit(1)
 
 
+def repair_dotenv_path(value: str) -> str:
+    """Undo common escapes from double-quoted Windows paths in .env files."""
+    replacements = {
+        "\a": r"\a",
+        "\b": r"\b",
+        "\f": r"\f",
+        "\n": r"\n",
+        "\r": r"\r",
+        "\t": r"\t",
+        "\v": r"\v",
+    }
+    for escaped, literal in replacements.items():
+        value = value.replace(escaped, literal)
+    return value
+
+
 # --------------------------------------------------------------------------- #
 # Data model
 # --------------------------------------------------------------------------- #
@@ -283,8 +299,12 @@ async def main():
     if not channels:
         fail("No channels given. Use --channel or set CHANNELS in .env.")
 
-    output_dir = Path(args.output_dir or (os.getenv("OUTPUT_DIR") or "").strip() or "output")
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir_value = args.output_dir or (os.getenv("OUTPUT_DIR") or "").strip() or "output"
+    output_dir = Path(repair_dotenv_path(output_dir_value))
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        fail(f"Invalid OUTPUT_DIR path {output_dir_value!r}: {e}")
 
     client = TelegramClient(session_name, api_id, api_hash)
     client.flood_sleep_threshold = 60
