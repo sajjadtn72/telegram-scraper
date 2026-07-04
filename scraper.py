@@ -92,6 +92,18 @@ def prompt_yes_no(question: str, *, default: bool) -> bool:
         print("Please answer y or n.")
 
 
+def classify_media(m) -> str:
+    """Bucket a message's media into one of: photo, video, audio, file.
+    'audio' covers both voice messages and music files (e.g. mp3)."""
+    if m.photo:
+        return "photo"
+    if m.video or m.video_note or m.gif:
+        return "video"
+    if m.voice or m.audio:
+        return "audio"
+    return "file"
+
+
 def prompt_output_format(default: str = "json") -> str:
     choices = {"1": "json", "2": "csv", "3": "both",
                "json": "json", "csv": "csv", "both": "both"}
@@ -223,7 +235,7 @@ async def get_sender_info(msg) -> dict:
 
 async def scrape_channel(client, entity, channel_label: str, *, min_id: int = 0,
                           limit: Optional[int] = None, download_media: bool,
-                          save_text: bool, media_dir: Path) -> list:
+                          media_types: set, save_text: bool, media_dir: Path) -> list:
     """Fetch posts newer than min_id (0 = all history). Albums are merged into
     a single Post using the message that carries the caption."""
     log(f"[{channel_label}] Fetching messages"
@@ -256,8 +268,10 @@ async def scrape_channel(client, entity, channel_label: str, *, min_id: int = 0,
         for m in msgs:
             if m.media and isinstance(m.media, (MessageMediaPhoto, MessageMediaDocument)):
                 media_count += 1
-                if download_media:
-                    fname = f"{msg_id}_{m.id}.jpg"
+                kind = classify_media(m)
+                if download_media and kind in media_types:
+                    ext = (m.file.ext if m.file and m.file.ext else "") or ".bin"
+                    fname = f"{msg_id}_{m.id}{ext}"
                     fpath = media_dir / fname
                     if not fpath.exists():
                         try:
@@ -355,7 +369,17 @@ def parse_args():
     p.add_argument("--format", choices=["json", "csv", "both"], default=None,
                    help="Output format. If omitted, the script asks before starting.")
     p.add_argument("--download-media", action="store_true",
-                   help="Download photos/documents without asking.")
+                   help="Download media without asking which types (implies all "
+                        "types not explicitly disabled below).")
+    p.add_argument("--photo", action=argparse.BooleanOptionalAction, default=None,
+                   help="Download photos. If omitted, asked interactively.")
+    p.add_argument("--video", action=argparse.BooleanOptionalAction, default=None,
+                   help="Download videos. If omitted, asked interactively.")
+    p.add_argument("--audio", action=argparse.BooleanOptionalAction, default=None,
+                   help="Download audio (voice messages and music/mp3). "
+                        "If omitted, asked interactively.")
+    p.add_argument("--file", action=argparse.BooleanOptionalAction, default=None,
+                   help="Download other files/documents. If omitted, asked interactively.")
     p.add_argument("--save-text", action=argparse.BooleanOptionalAction, default=None,
                    help="Save message text. If omitted, the script asks before starting.")
     p.add_argument("--limit", type=int, default=None,
@@ -368,21 +392,40 @@ def parse_args():
 def configure_run(args):
     if sys.stdin.isatty():
         download_media = args.download_media or prompt_yes_no(
-            "Download photos/files?", default=False)
+            "Download media files?", default=False)
+        media_types = set()
+        if download_media:
+            per_type = {
+                "photo": ("Download photos?", args.photo),
+                "video": ("Download videos?", args.video),
+                "audio": ("Download audio (voice messages + music/mp3)?", args.audio),
+                "file": ("Download other files/documents?", args.file),
+            }
+            for kind, (question, flag) in per_type.items():
+                wanted = flag if flag is not None else prompt_yes_no(
+                    "  " + question, default=True)
+                if wanted:
+                    media_types.add(kind)
         save_text = args.save_text
         if save_text is None:
             save_text = prompt_yes_no("Save message texts?", default=True)
         output_format = args.format or prompt_output_format("json")
     else:
         download_media = args.download_media
+        media_types = {
+            kind for kind, flag in (
+                ("photo", args.photo), ("video", args.video),
+                ("audio", args.audio), ("file", args.file),
+            ) if flag or (flag is None and download_media)
+        }
         save_text = True if args.save_text is None else args.save_text
         output_format = args.format or "both"
 
     log("Options: "
-        f"media={'yes' if download_media else 'no'}, "
+        f"media={'yes (' + ', '.join(sorted(media_types)) + ')' if download_media and media_types else ('yes (none selected)' if download_media else 'no')}, "
         f"text={'yes' if save_text else 'no'}, "
         f"format={output_format}")
-    return download_media, save_text, output_format
+    return download_media, media_types, save_text, output_format
 
 
 async def main():
@@ -412,7 +455,7 @@ async def main():
     except OSError as e:
         fail(f"Invalid output directory path {output_dir_value!r}: {e}")
 
-    download_media, save_text, output_format = configure_run(args)
+    download_media, media_types, save_text, output_format = configure_run(args)
 
     client = TelegramClient(session_name, api_id, api_hash)
     client.flood_sleep_threshold = 60
@@ -449,8 +492,8 @@ async def main():
             new_posts = await scrape_channel(
                 client, entity, label,
                 min_id=scrape_min_id, limit=args.limit,
-                download_media=download_media, save_text=save_text,
-                media_dir=media_dir,
+                download_media=download_media, media_types=media_types,
+                save_text=save_text, media_dir=media_dir,
             )
         except (ChatAdminRequiredError, ChannelPrivateError) as e:
             log(f"[{label}] Cannot access channel: {type(e).__name__}. Skipping.")
