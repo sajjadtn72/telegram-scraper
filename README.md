@@ -26,7 +26,11 @@ gauge its health (activity level, most active members, engagement trends).
 - **Sender info for groups** — saves sender id/name/username when Telegram
   exposes it, so AI tools can analyze who said what in group exports.
 - **Media download is opt-in** (`--download-media`) — by default only a
-  `media_count` is recorded, nothing is downloaded.
+  `media_count` is recorded, nothing is downloaded. When enabled, the script
+  asks separately whether to download **photos**, **videos**, **audio**
+  (voice messages and music/mp3), and **other files** — you can say yes to
+  some and no to others. Downloaded files get their real extension
+  (`.mp4`, `.ogg`, `.jpg`, ...), not a fixed one.
 - **Album-aware** — grouped photos/videos are merged into a single post
   using the message that carries the caption.
 - **Flood-wait safe** — automatically sleeps and retries when Telegram
@@ -72,13 +76,16 @@ CHANNELS = ""
 | `CHANNELS` | Comma-separated list of channels **or groups** (username, link, or numeric id) |
 
 Channels are read from `.env` — the script does not ask for them in the
-terminal. Before scraping starts, the script asks:
+terminal. Before scraping starts, the script asks (in this order):
 
-- whether to download photos/files
-- whether to save message text
-- which output format to write: `json`, `csv`, or `both`
+1. whether to download media at all
+2. if yes: whether to download **photos**, then **videos**, then **audio**
+   (voice messages + music/mp3), then **other files** — one question per type
+3. whether to save message text
+4. which output format to write: `json`, `csv`, or `both`
 
-These can also be set via command-line flags to skip the prompts (see Usage).
+These can all be set via command-line flags to skip the prompts (see Usage) —
+useful when running the script unattended or from another script.
 
 **Logging in the first time:** the script needs your phone number, and
 Telegram will send a login code to your Telegram app (not SMS necessarily —
@@ -106,8 +113,14 @@ python scraper.py --channel mychannel --channel https://t.me/mygroup
 # Also write CSV
 python scraper.py --format both
 
-# Download media too (off by default)
+# Download media too (off by default) — still asks photo/video/audio/file one by one
 python scraper.py --download-media
+
+# Download media without any per-type prompts: only photos and videos
+python scraper.py --download-media --photo --video --no-audio --no-file
+
+# Download everything except voice/audio, no prompts at all
+python scraper.py --download-media --photo --video --no-audio --file --save-text --format both
 
 # Skip message text and save only metadata/media info
 python scraper.py --no-save-text
@@ -145,12 +158,13 @@ there:
   ```
 - `<channel>_posts.csv` — same fields, flattened (only with `--format csv|both`).
 
-If `--download-media` is set, photos and files are saved under
-`output/<channel>/media/`.
+If `--download-media` is set, the media types you said yes to (photo, video,
+audio, file) are saved under `output/<channel>/media/`, each with its real
+file extension.
 
-If you already scraped a channel without media, set `DOWNLOAD_MEDIA = "true"`
-in `.env` and run the script again. It will scan the saved history too and
-skip files that already exist.
+If you already scraped a channel without media, just run the script again and
+say yes to media download (or pass `--download-media` + the type flags). It
+will scan the saved history too and skip files that already exist.
 
 ## Notes & limitations
 
